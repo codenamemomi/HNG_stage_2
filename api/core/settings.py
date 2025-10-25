@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     DB_PORT: str = "3306"
     DB_NAME: str = "countrydb"
 
-    COUNTRIES_API: str = "https://restcountries.com/v2/all?fields=name,capital,region,population,flag,currencies"
+    COUNTRIES_API: str = "https://restcountries.com/v3.1/all?fields=name,capital,region,population,flag,currencies"
     EXCHANGE_API: str = "https://open.er-api.com/v6/latest/USD"
 
     class Config:

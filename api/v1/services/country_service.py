@@ -51,15 +51,16 @@ async def refresh_countries():
 
     async with database.transaction():
         for country in countries_data:
-            name = country.get("name")
             try:
-                capital = country.get("capital")
+                name = country.get("name", {}).get("common")
+                capital_list = country.get("capital", [])
+                capital = capital_list[0] if capital_list else None
                 region = country.get("region")
                 population = country.get("population") or 0
-                flag = country.get("flag")
+                flag = country.get("flags", {}).get("png")
 
-                currencies = country.get("currencies", [])
-                currency_code = currencies[0]["code"] if currencies else None
+                currencies = country.get("currencies", {})
+                currency_code = next(iter(currencies.keys()), None)
 
                 exchange_rate = exchange_rates.get(currency_code) if currency_code else None
 
@@ -69,7 +70,8 @@ async def refresh_countries():
                 else:
                     estimated_gdp = 0.0
 
-                query_existing = text("SELECT id FROM countries WHERE LOWER(name)=LOWER(:name)")
+                # ✅ FIXED — removed text() wrappers
+                query_existing = "SELECT id FROM countries WHERE LOWER(name)=LOWER(:name)"
                 existing_id = await database.fetch_val(query_existing, values={"name": name})
 
                 values = {
@@ -85,28 +87,29 @@ async def refresh_countries():
                 }
 
                 if existing_id:
-                    query_update = text("""
+                    query_update = """
                         UPDATE countries
                         SET capital=:capital, region=:region, population=:population,
                             currency_code=:currency_code, exchange_rate=:exchange_rate,
                             estimated_gdp=:estimated_gdp, flag_url=:flag_url,
                             last_refreshed_at=:last_refreshed_at
                         WHERE id=:id
-                    """)
+                    """
                     await database.execute(query_update, values={**values, "id": existing_id})
                 else:
-                    query_insert = text("""
+                    query_insert = """
                         INSERT INTO countries (name, capital, region, population,
                             currency_code, exchange_rate, estimated_gdp, flag_url, last_refreshed_at)
                         VALUES (:name, :capital, :region, :population, :currency_code,
                             :exchange_rate, :estimated_gdp, :flag_url, :last_refreshed_at)
-                    """)
+                    """
                     await database.execute(query_insert, values)
 
                 total_countries += 1
 
             except Exception as e:
-                pass
+                logger.error(f"❌ Error processing country {country.get('name')}: {e}")
+                continue
 
         await generate_summary_image(database, total_countries, last_refreshed_at)
 
